@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.swp
+.venv/
+
+# Cloned/built repos + generated artifacts (KBS storage, NVChip, images) --
+# regenerated from scratch by manual_boot_setup.py, not source.
+workspace/
