@@ -12,6 +12,7 @@ from . import shell
 
 _NONCE_RE = re.compile(r"Initial Nonce:\s+([0-9a-f]{32})")
 _COUNTER_RE = re.compile(r"Initial Counter:\s+(\d+)")
+_FS_UPDATE_COUNTER_RE = re.compile(r"Initial FS Update Counter:\s+([0-9a-f]{32})")
 
 NVCHIP_CONTAINER_PATH = "/app/tpm_provisioner/NVChip"
 
@@ -44,14 +45,16 @@ def provision_image(vtpm_blk_dir: Path, key_file: Path, state_file: Path,
     )
     nonce_match = _NONCE_RE.search(proc.stdout)
     counter_match = _COUNTER_RE.search(proc.stdout)
-    if not nonce_match or not counter_match:
+    fs_update_counter_match = _FS_UPDATE_COUNTER_RE.search(proc.stdout)
+    if not nonce_match or not counter_match or not fs_update_counter_match:
         raise RuntimeError(
-            "could not parse nonce/boot_counter from vtpm-to-svsm-blk output; "
-            "its banner format may have changed:\n" + proc.stdout
+            "could not parse nonce/boot_counter/fs_update_counter from vtpm-to-svsm-blk "
+            "output; its banner format may have changed:\n" + proc.stdout
         )
     return {
         "image": out_dir / "vtpm_state.img",
         "resource_id": resource_id,
         "nonce": nonce_match.group(1),
         "boot_counter": int(counter_match.group(1)),
+        "fs_update_counter": fs_update_counter_match.group(1),
     }

@@ -65,7 +65,9 @@ def main():
         vtpm_blk_dir, key_file, nvchip, resource_id, manual_dir / "artefact"
     )
     container.set_resource(kbs_client, resource_id, key_file)
-    container.register_nonce(resource_id, info["boot_counter"], info["nonce"])
+    container.register_nonce(
+        resource_id, info["boot_counter"], info["nonce"], info["fs_update_counter"]
+    )
 
     print("=== verifying KBS state on disk (equivalent of `ls`/`cat`) ===")
     repo_dir = container.storage_dir / "repository"
@@ -93,7 +95,8 @@ Setup complete -- KBS is running and will stay running after this exits.
   KBS URL:          {container.url}
   Resource ID:      {resource_id}
   CocoonFS image:   {info["image"]}
-  Registered:       boot_counter={info["boot_counter"]}, nonce={info["nonce"]}
+  Registered:       boot_counter={info["boot_counter"]}, nonce={info["nonce"]},
+                    fs_update_counter={info["fs_update_counter"]}
 
 Next steps (manual -- see KBS-SVSM.md in the svsm repo, steps 9-10:
 https://github.com/armenon-rh/svsm/blob/feature/anti-replay/Documentation/docs/developer/KBS-SVSM.md
@@ -122,11 +125,20 @@ persistence)
 
      tail -f <svsm-repo>/aproxy.log
      cat {cfg.KBS_STORAGE_DIR}/svsm-anti-replay/{escaped}
-     # boot_counter should now read {info["boot_counter"] + 1}, nonce should have changed
+     # boot_counter should now read {info["boot_counter"] + 1}, nonce should have changed,
+     # and fs_update_counter should have moved on from {info["fs_update_counter"]}
+     # (bumped once right after mount via sync-fs-counter, and again on every
+     # subsequent committed write -- see FS_UPDATE_COUNTER_ANTI_SPLICE_PLAN.md)
 
-   To exercise the replay-rejection path: copy {info["image"]} aside *before*
-   step 2, let that boot complete and roll the counter, then try booting the
-   pre-boot copy -- KBS should reject it with HTTP 403 NonceMismatch.
+   To exercise the header/nonce replay-rejection path: copy {info["image"]} aside
+   *before* step 2, let that boot complete and roll the counter, then try booting
+   the pre-boot copy -- KBS should reject it with HTTP 403 NonceMismatch.
+
+   To exercise the fs_update_counter splice-rejection path instead: after a
+   successful boot, take a *fresh* copy of the now-rolled image, then manually
+   roll just its CocoonFS payload backward (e.g. via `cocoonfs ... write-file`
+   with older state) while leaving the plaintext header as-is, and boot that --
+   KBS should reject it with HTTP 403 FsCounterMismatch instead.
 
 When you're done testing, tear down the container:
 

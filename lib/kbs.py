@@ -65,13 +65,17 @@ class KbsContainer:
             "--path", resource_path, "--resource-file", str(resource_file),
         ])
 
-    def register_nonce(self, resource_id: str, boot_counter: int, nonce_hex: str, version: int = 1):
-        code, body = http.curl_json("POST", f"{self.url}/kbs/v0/svsm/register-nonce", json_body={
+    def register_nonce(self, resource_id: str, boot_counter: int, nonce_hex: str,
+                        fs_update_counter_hex: str = None, version: int = 1):
+        payload = {
             "version": version,
             "resource_id": resource_id,
             "boot_counter": boot_counter,
             "nonce": nonce_hex,
-        })
+        }
+        if fs_update_counter_hex is not None:
+            payload["fs_update_counter"] = fs_update_counter_hex
+        code, body = http.curl_json("POST", f"{self.url}/kbs/v0/svsm/register-nonce", json_body=payload)
         if code != 200:
             raise RuntimeError(f"register-nonce failed: HTTP {code}: {body}")
         return body
